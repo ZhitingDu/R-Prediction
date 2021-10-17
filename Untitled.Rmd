@@ -77,6 +77,9 @@ unemp_de <- unemp_de_raw
 
 names(unemp_de) <- paste0("V",1:ncol(unemp_de))
 ```
+The important columns are:
+
+
 
 
 ```{r}
@@ -94,23 +97,33 @@ unemp_de <- unemp_de %>%
 # AfD election results
 
 ```{r}
-
+elec_file <- "~/Documents/Github/R-Prediction/kerg.csv"
+file.exists(elec_file)
 ```
 
 
 ```{r}
-
+library(readr)
+elec_results <- read_csv(elec_file)
 ```
 
 
 
 ```{r}
 
+afd_prop <- elec_results %>%
+  select(1, 2, 46, 18) %>%
+  rename(afd_votes = AfD3,
+         area_nr = Nr,
+         area_name = Gebiet,
+         votes_total = Waehler_gueltige_Zweitstimmen_vorlauefig) %>%
+  mutate(afd_prop = afd_votes / votes_total) %>%
+  na.omit
 ```
 
 
 ```{r}
-
+View()
 ```
 
 
