@@ -1,30 +1,154 @@
 ---
-title: "Untitled"
-author: "dzt"
-date: "10/17/2021"
-output: html_document
+title: "2021 Selection Analysis"
+
+output: 
+  html_document: 
+    toc: yes
+    theme: cerulean
 ---
 
+
+
+
+```{r}
+library(sf)
+library(stringr)
+library(tidyverse)
+library(readxl)
+library(magrittr)
+library(huxtable)
+library(broom)
+```
+
+
+
+# Geo data
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+my_path_wahlkreise <- "~/Documents/Github/R-Prediction/btw21_geometrie_wahlkreise_shp/Geometrie_Wahlkreise_20DBT.shp"
+file.exists(my_path_wahlkreise)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+wahlkreise_shp <- st_read(my_path_wahlkreise)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+glimpse(wahlkreise_shp)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+wahlkreise_shp %>%
+  ggplot() +
+  geom_sf()
+```
+
+```{r}
+wahlkreise_shp %>%
+  ggplot() +
+  geom_sf(fill = "grey40") +
+  theme_void()
+```
+
+# unemployment ratios
+
+```{r}
+unemp_file <- "~/Documents/Github/R-Prediction/btw21_Strukturdaten.csv"
+
+file.exists(unemp_file)
+```
+
+
+```{r}
+unemp_de_raw <- read_delim(unemp_file,
+    ";", escape_double = FALSE,
+    locale = locale(decimal_mark = ",",
+        grouping_mark = "."),
+    trim_ws = TRUE,
+    skip = 8)  # skipt the first 8 rows
+```
+
+
+
+
+```{r}
+unemp_names <- names(unemp_de_raw)
+
+unemp_de <- unemp_de_raw
+
+names(unemp_de) <- paste0("V",1:ncol(unemp_de))
+```
+
+
+```{r}
+unemp_de <- unemp_de %>%
+  rename(state = V1,
+         area_nr = V2,
+         area_name = V3,
+         for_prop = V8,
+         pop_move = V11,
+         pop_migr_background = V19,
+         income = V26,
+         unemp = V47)  
+```
+
+# AfD election results
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
