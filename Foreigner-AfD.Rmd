@@ -1,0 +1,175 @@
+---
+title: "2021 Selection Analysis Mapping foreigner ratio to AfD election results in the German Wahlkreise"
+
+output: 
+  html_document: 
+    toc: yes
+    theme: cerulean
+---
+
+
+# Mapping foreigner ratio to AfD election results in the German Wahlkreise
+
+```{r}
+library(sf)
+library(stringr)
+library(tidyverse)
+library(magrittr)
+library(huxtable)
+library(broom)
+library(viridis)
+```
+
+
+```{r setup, include=FALSE}
+my_path_wahlkreise <- "~/Documents/Github/R-Prediction/btw21_geometrie_wahlkreise_shp/Geometrie_Wahlkreise_20DBT.shp"
+file.exists(my_path_wahlkreise)
+```
+
+```{r}
+wahlkreise_shp <- st_read(my_path_wahlkreise)
+```
+
+```{r}
+glimpse(wahlkreise_shp)
+```
+
+```{r}
+wahlkreise_shp %>%
+  ggplot() +
+  geom_sf()
+```
+
+
+```{r}
+foreign_file <- "~/Documents/Github/R-Prediction/btw21_Strukturdaten.csv"
+
+file.exists(foreign_file)
+```
+
+
+```{r}
+foreign_raw <- read_delim(foreign_file,
+    ";", escape_double = FALSE,
+    locale = locale(decimal_mark = ",",
+        grouping_mark = "."),
+    trim_ws = TRUE,
+    skip = 8)  # skipt the first 8 rows
+```
+
+
+```{r}
+foreign_names <- names(foreign_raw)
+
+foreign_df <- foreign_raw
+
+names(foreign_df) <- paste0("V",1:ncol(foreign_df))
+```
+
+```{r}
+foreign_df <- foreign_df %>% 
+  rename(state = V1,
+         area_nr = V2,
+         area_name = V3,
+         for_prop = V8,
+         pop_move = V11,
+         pop_migr_background = V19,
+         income = V26,
+         unemp = V47)  # total, as to March 2017
+```
+
+
+## AfD election results
+
+
+```{r}
+elec_results = read.csv2("~/Documents/Github/R-Prediction/kerg.csv", head = TRUE, sep="\t")
+```
+
+
+
+```{r}
+head(elec_results)
+```
+
+```{r}
+afd_prop <- elec_results %>% 
+
+  rename(afd_votes = AfD3,
+         area_nr = Nr,
+         area_name = Gebiet,
+         votes_total = Waehler_gueltige_Zweitstimmen_vorlauefig) %>% 
+  mutate(afd_prop = afd_votes / votes_total) %>% 
+  na.omit
+```
+
+
+
+```{r}
+foreign_df$area_nr <- as.integer(foreign_df$area_nr)
+```
+
+
+```{r}
+wahlkreise_shp %>% 
+  left_join(foreign_df, by = c("WKR_NR" = "area_nr")) %>% 
+  left_join(afd_prop, by = "area_name") -> chloro_data
+```
+
+```{r}
+chloro_data %>% 
+  ggplot() +
+  geom_sf(aes(fill = afd_prop)) -> p1
+p1
+```
+
+```{r}
+p1 + scale_fill_distiller(palette = "Spectral") +
+  theme_void()
+```
+## Geo map (of election areas) with foreign national data
+```{r}
+chloro_data %>% 
+  ggplot() +
+  geom_sf(aes(fill = for_prop)) +
+  scale_fill_distiller(palette = "Spectral") +
+  theme_void() -> p2
+p2
+```
+## “AfD to foreigner density”
+```{r}
+chloro_data %>% 
+  mutate(afd_for_dens = afd_prop / (for_prop/100)) -> chloro_data
+  
+chloro_data %>% 
+  ggplot +
+  geom_sf(aes(fill = afd_for_dens)) +
+  theme_void() +
+  scale_fill_viridis()
+```
+
+```{r}
+chloro_data %>% 
+  select(afd_for_dens, afd_prop, for_prop) %>% 
+  as.data.frame %>% 
+  slice(1:3)
+```
+## Correlation of foreign national quote and AfD votes
+```{r}
+chloro_data %>% 
+  select(for_prop, afd_prop, area_name) %>% 
+  ggplot +
+  aes(x = for_prop, y = afd_prop) +
+  geom_point() +
+  geom_smooth()
+```
+
+```{r}
+chloro_data %>% 
+  select(for_prop, afd_prop, area_name) %>% 
+  as.data.frame %T>% 
+  summarise(cor_afd_foreigners = cor(afd_prop, for_prop)) %>% 
+  do(tidy(cor.test(.$afd_prop, .$for_prop)))
+
+```
+
