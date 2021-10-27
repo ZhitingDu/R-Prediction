@@ -125,13 +125,9 @@ afd_prop <- elec_results %>%
 ```
 
 ```{r}
-glimpse(afd_prop)
+view(afd_prop)
 ```
 
-
-```{r}
-glimpse(unemp_de)
-```
 
 ```{r}
 unemp_de$area_nr <- as.integer(unemp_de$area_nr)
@@ -144,8 +140,9 @@ wahlkreise_shp %>%
   left_join(unemp_de, by = c("WKR_NR" = "area_nr")) %>%
   left_join(afd_prop, by = "area_name") -> chloro_data
 ```
-##  Plot geo map with afd votes
 
+
+##  Plot geo map with afd votes
 ```{r}
 chloro_data %>%
   ggplot() +
@@ -314,10 +311,17 @@ chloro_data %>%
   do(tidy(cor.test(.$afd_prop, .$unemp)))
 ```
 
+
+## Regression residuals of predicting unemployment by afd_score
+
 ```{r}
 lm1 <- lm(afd_prop ~ unemp, data = chloro_data)
 
 chloro_data %>%
   mutate(afd_lm1 = lm(afd_prop ~ unemp, data = .)$residuals) -> chloro_data
 ```
+```{r}
+nrow(afd_lm1)
+```
+
 
