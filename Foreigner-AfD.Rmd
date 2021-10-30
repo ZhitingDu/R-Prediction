@@ -39,7 +39,7 @@ wahlkreise_shp %>%
   ggplot() +
   geom_sf()
 ```
-
+# Foreign nationals ratios
 
 ```{r}
 foreign_file <- "~/Documents/Github/R-Prediction/btw21_Strukturdaten.csv"
@@ -56,7 +56,7 @@ foreign_raw <- read_delim(foreign_file,
     trim_ws = TRUE,
     skip = 8)  # skipt the first 8 rows
 ```
-
+we need to do some cleansing before we can work with this dataset.
 
 ```{r}
 foreign_names <- names(foreign_raw)
@@ -66,6 +66,7 @@ foreign_df <- foreign_raw
 names(foreign_df) <- paste0("V",1:ncol(foreign_df))
 ```
 
+The important columns are:
 ```{r}
 foreign_df <- foreign_df %>% 
   rename(state = V1,
@@ -79,7 +80,7 @@ foreign_df <- foreign_df %>%
 ```
 
 
-## AfD election results
+# AfD election results
 
 
 ```{r}
@@ -104,7 +105,7 @@ afd_prop <- elec_results %>%
 ```
 
 
-
+# Match foreign national rated to AfD votes for each Wahlkreis
 ```{r}
 foreign_df$area_nr <- as.integer(foreign_df$area_nr)
 ```
@@ -127,7 +128,7 @@ p1
 p1 + scale_fill_distiller(palette = "Spectral") +
   theme_void()
 ```
-## Geo map (of election areas) with foreign national data
+# Geo map (of election areas) with foreign national data
 ```{r}
 chloro_data %>% 
   ggplot() +
@@ -136,7 +137,7 @@ chloro_data %>%
   theme_void() -> p2
 p2
 ```
-## “AfD to foreigner density”
+# “AfD to foreigner density”
 ```{r}
 chloro_data %>% 
   mutate(afd_for_dens = afd_prop / (for_prop/100)) -> chloro_data
@@ -154,7 +155,9 @@ chloro_data %>%
   as.data.frame %>% 
   slice(1:3)
 ```
-## Correlation of foreign national quote and AfD votes
+The diagram shows that in relation to foreigner rates, the AfD votes are strongest in Saxonian Wahlkreise primarily. Second, the East is surprisingly strong more “AfD dense” compared to the West. Don’t forget that this measure is an indication of co-occurrence, not of absolute AfD votes.
+
+# Correlation of foreign national quote and AfD votes
 ```{r}
 chloro_data %>% 
   select(for_prop, afd_prop, area_name) %>% 
@@ -163,7 +166,7 @@ chloro_data %>%
   geom_point() +
   geom_smooth()
 ```
-
+The correlation itself is
 ```{r}
 chloro_data %>% 
   select(for_prop, afd_prop, area_name) %>% 
@@ -172,4 +175,92 @@ chloro_data %>%
   do(tidy(cor.test(.$afd_prop, .$for_prop)))
 
 ```
+
+# Separate the trends for eastern and Western German electoral districts.
+```{r}
+unique(chloro_data$LAND_NAME)
+```
+
+
+```{r}
+east <- c("Mecklenburg-Vorpommern", "Brandenburg", "Sachsen-Anhalt", "Sachsen", "Thüringen")
+
+chloro_data %>%
+  mutate(east = LAND_NAME %in% east) -> chloro_data
+
+
+chloro_data %>% 
+  select(east, LAND_NAME) %>% 
+  count(LAND_NAME, east)
+```
+
+
+```{r}
+chloro_data %>% 
+  select(for_prop, afd_prop, area_name, east) %>% 
+  ggplot +
+  aes(x = for_prop, y = afd_prop) +
+  geom_point() +
+  geom_smooth(aes(color = east), method = "lm")
+```
+
+
+# Regression residuals of predicting foreigner quote by afd_score
+
+
+Let’s predict the AfD vote score taking the unemployment as an predictor. Then let’s plot the residuals to see how good the prediction is, ie., how close (or rather, far) the association of unemployment and AfD voting is
+```{r}
+chloro_data$afd_prop[is.na(chloro_data$afd_prop)] <- 0
+```
+
+
+
+```{r}
+
+lm2 <- lm(afd_prop ~ for_prop, data = chloro_data)
+
+glance(lm2)
+
+tidy(lm2)
+
+
+chloro_data %>% 
+  mutate(afd_lm2 = lm(afd_prop ~ for_prop, data = .)$residuals) -> chloro_data
+```
+
+
+
+
+```{r}
+chloro_data %>% 
+  select(afd_lm2) %>% 
+  ggplot() +
+  geom_sf(aes(fill = afd_lm2)) +
+  scale_fill_gradient2() +
+  theme_void()
+```
+
+
+Let’s include east as a predictor to the linear model:
+
+```{r}
+lm3 <- lm(afd_prop ~ for_prop*east, data = chloro_data)
+
+glance(lm3)
+tidy(lm3)
+```
+
+R squared increased dramatically, fostering the line of thought in the EDIT above. Now, we see that the general foreigner quote is not significiant anymore; we may infer that it plays no important role. But whether a wahlrkeis is East or not does play a strong role. For the East, the slope decreases quite a bit indicating some negative effect on foreigner quotes to AfD success.
+
+
+
+
+
+
+
+
+
+
+
+
 
