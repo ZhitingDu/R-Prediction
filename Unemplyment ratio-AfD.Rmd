@@ -389,5 +389,5 @@ chloro_data %>%
   scale_fill_gradient2() +
   theme_void()
 ```
-This model shows a clearcut picture: The eastern part is too “afd” for its unemployment ratio (some parts of east-southern Bavaria too); the west is less afd-ic than what would be expected by the unemployment. The rest (middle and south) parts over-and-above show the AfD levels that woul be expected by their unemployment.
+
 
