@@ -68,7 +68,7 @@ unemp_de_raw <- read_delim(unemp_file,
 ```
 
 
-
+we need to do some cleansing before we can work with this dataset.
 
 ```{r}
 unemp_names <- names(unemp_de_raw)
@@ -81,7 +81,7 @@ The important columns are:
 
 
 
-
+The important columns are:
 ```{r}
 unemp_de <- unemp_de %>%
   rename(state = V1,
@@ -109,10 +109,16 @@ elec_results = read.csv2("~/Documents/Github/R-Prediction/kerg.csv", head = TRUE
 ```{r}
 head(elec_results)
 ```
+
 ```{r}
 glimpse(wahlkreise_shp)
 ```
+For each party, four values are reported:
 
+primary vote, present election
+primary vote, previous election
+secondary vote, present election
+secondary vote, previous election
 
 ```{r}
 afd_prop <- elec_results %>%
@@ -125,13 +131,11 @@ afd_prop <- elec_results %>%
 ```
 
 ```{r}
-view(afd_prop)
-```
-
-
-```{r}
 unemp_de$area_nr <- as.integer(unemp_de$area_nr)
 ```
+
+In the previous step, we have selected the columns of interest, changed their name (shorter, English), and have computed the proportion of (valid) secondary votes in favor of the AfD.
+
 
 ##  Match unemployment and income to AfD votes for each Wahlkreis
 
@@ -139,6 +143,19 @@ unemp_de$area_nr <- as.integer(unemp_de$area_nr)
 wahlkreise_shp %>%
   left_join(unemp_de, by = c("WKR_NR" = "area_nr")) %>%
   left_join(afd_prop, by = "area_name") -> chloro_data
+```
+
+```{r}
+view(unemp_de)
+```
+
+
+```{r}
+view(wahlkreise_shp)
+```
+
+```{r}
+view(chloro_data)
 ```
 
 
@@ -169,6 +186,10 @@ p2
 
 
 ##  Concordance of AfD results and unemployment/income
+
+Let’s compute the percent ranking for each of the variables of interest (AfD votes, unemployment ratio, and income). Then we can compute the concordance for each pair by simply computing the difference (or maybe absolute difference). After that, we plot this “concordance variables” as fill color to the map.
+
+
 ```{r}
 chloro_data %>%
   mutate(afd_rank = percent_rank(afd_prop),
@@ -178,6 +199,7 @@ chloro_data %>%
          afd_unemp_diff = subtract(afd_rank, unemp_rank)) -> chloro_data
 ```
 
+Let’s check the first ranks for each of the variables of interest. AfD ranks first:
 
 ```{r}
 chloro_data %>%
@@ -187,7 +209,7 @@ chloro_data %>%
   slice(1:5)
 ```
 
-
+Goerlitz leads. Unemployment “top” places:
 
 ```{r}
 chloro_data %>%
@@ -197,7 +219,7 @@ chloro_data %>%
   slice(1:5)
 ```
 
-
+Gelsenkirchen is ahead of this sad pack. And the lowest unemployment ranks are at:
 
 
 ```{r}
@@ -208,7 +230,7 @@ chloro_data %>%
   slice(1:5)
 ```
 
-
+And finale income, low 5 and top 5:
 
 ```{r}
 chloro_data %>%
@@ -227,6 +249,18 @@ chloro_data %>%
   theme_void() -> p3
 p3
 ```
+
+The fill color denotes the difference between unemployment rank of a given area and its afd vote rank. For example, if area X has an unemployment rank of .5 (50%), it means that half of the areas in the country have a lower (higher) unemployment ratio, respectively (the median). Similarly, an AfD vote rank of .5 indicates the median position. The difference of these two figures is zero, indicating accordance or close match. Thus, figures around zero denote accordance or match. 1 (100%) of AfD vote rank indicates the area with the best AfD results (area with the most votes); similar reasoning applies for income and unemployment ratio.
+
+Hence, numbers greater than zero indicate that the AfD scored better than it would be expected by the accordance-hypothesis.
+
+Similarly, numbers smaller than zero indicate that the AfD scored better than it would be expected by the accordance-hypothesis.
+
+Areas with (near) white filling provide some support for the accordance hypothesis. There are areas of this type, but it is not the majority. The vast majority of areas showed too much or too little AfD - relative to their unemployment ratio.
+
+This reasonsing shows that the AfD received better results in southern and middle areas of Germany than it would be expected by the accordance hypothesis. In contrast, the more poorer northern areas voted for the AfD much less often than it would be expected by the accordance hypothesis.
+
+Let’s look at the areas with minimal and maximal dis-accordance, out of curiosity.
 
 
 
@@ -253,7 +287,7 @@ chloro_data %>%
 ```
 
 
-
+Similar story for income.
 ```{r}
 chloro_data %>%
   ggplot() +
@@ -263,7 +297,13 @@ chloro_data %>%
 p4
 ```
 
+
+The map shows a clear pattern: The eastern parts of Germany are far more afd-oriented than their income rank would predict (diff scores above zero, blue color). However, for some areas across the whole rest of the country, the likewise pattern is true too: A lot areas are rich and do not vote for the AfD (reddish color, diff score below zero). And, thirdly, a lot of aras support the accordance hypothesis (white color, diff score around zero).
+
 ## More simple map
+Maybe we should simplify the map: Let’s only distinguish three type of areas: too much AfD in comparison to the unemployment, too few AfD for the unemployment, or AfD at par with unemployment. Maybe the picture is more clearcut then.
+
+
 ```{r}
 chloro_data %>%
   select(afd_unemp_diff) %>%
@@ -279,6 +319,8 @@ chloro_data %>%
 
 ##  “AfD density”
 
+In a similar vein, we could compute the ratio of AfD votes and unemployment. That would give us some measure of covariability. Let’s see
+
 ```{r}
 library(viridis)
 chloro_data %>%
@@ -288,9 +330,11 @@ chloro_data %>%
   theme_void() +
   scale_fill_viridis()
 ```
-
+The diagram shows that in relation to unemployment, the AfD votes are strongest in Sachsen. Don’t forget that this measure is an indication of co-occurence, not of absolute AfD votes.
 
 ##  Correlation of unemployment and AfD votes
+
+A simple, straight-forward and well-known approach to devise assocation strength is Pearson’s correlation coefficient. Oldie but goldie. Let’s depict it.
 
 ```{r}
 chloro_data %>%
@@ -312,16 +356,38 @@ chloro_data %>%
 ```
 
 
+
+
+
 ## Regression residuals of predicting unemployment by afd_score
+
+
+Let’s predict the AfD vote score taking the unemployment as an predictor. Then let’s plot the residuals to see how good the prediction is, ie., how close (or rather, far) the association of unemployment and AfD voting is.
+
+```{r}
+chloro_data$afd_prop[is.na(chloro_data$afd_prop)] <- 0
+```
+
+```{r}
+view(chloro_data$afd_prop)
+```
+
 
 ```{r}
 lm1 <- lm(afd_prop ~ unemp, data = chloro_data)
 
 chloro_data %>%
-  mutate(afd_lm1 = lm(afd_prop ~ unemp, data = .)$residuals) -> chloro_data
-```
-```{r}
-nrow(afd_lm1)
+  mutate(afd_lm1 = lm(afd_prop ~ unemp, data =  chloro_data)$residuals) -> chloro_data
 ```
 
+
+```{r}
+chloro_data %>%
+  select(afd_lm1) %>%
+  ggplot() +
+  geom_sf(aes(fill = afd_lm1)) +
+  scale_fill_gradient2() +
+  theme_void()
+```
+This model shows a clearcut picture: The eastern part is too “afd” for its unemployment ratio (some parts of east-southern Bavaria too); the west is less afd-ic than what would be expected by the unemployment. The rest (middle and south) parts over-and-above show the AfD levels that woul be expected by their unemployment.
 
