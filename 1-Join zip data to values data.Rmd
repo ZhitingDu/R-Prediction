@@ -1,0 +1,243 @@
+---
+title: "Join zip data to values data"
+
+output: 
+  html_document: 
+    toc: yes
+    theme: cerulean
+---
+
+
+#  Mapping AfD election results in German Wahlkreise
+
+```{r}
+library(sf)
+library(stringr)
+library(tidyverse)
+library(readxl)
+library(magrittr)
+library(huxtable)
+library(broom)
+```
+
+
+
+## Geo data
+```{r setup, include=FALSE}
+my_path_wahlkreise <- "~/Documents/Github/R-Prediction/btw21_geometrie_wahlkreise_shp/Geometrie_Wahlkreise_20DBT.shp"
+file.exists(my_path_wahlkreise)
+```
+
+```{r}
+wahlkreise_shp <- st_read(my_path_wahlkreise)
+```
+
+```{r}
+glimpse(wahlkreise_shp)
+```
+
+
+
+## data
+
+```{r}
+data <- "~/Documents/Github/R-Prediction/btw21_Strukturdaten.csv"
+
+file.exists(data)
+```
+
+
+```{r}
+data_raw <- read_delim(data,
+    ";", escape_double = FALSE,
+    locale = locale(decimal_mark = ",",
+        grouping_mark = "."),
+    trim_ws = TRUE,
+    skip = 8)  # skipt the first 8 rows
+```
+
+
+we need to do some cleansing before we can work with this dataset.
+
+```{r}
+data_names <- names(data_raw)
+
+data_de <- data_raw
+
+names(data_de) <- paste0("V",1:ncol(data_de))
+```
+The important columns are:
+
+
+
+The important columns are:
+```{r}
+data_de <- data_de %>%
+  rename(state = V1,
+         area_nr = V2,
+         area_name = V3,
+         total_n = V6,
+         germans_n = V7,
+         for_prop = V8,
+         pop_move_prop = V11,
+         pop_migr_background_prop = V19,
+         income = V26,
+         unemp_prop = V47)
+```
+
+
+Compute some more columns and remove missing vlaues:
+
+```{r socec-new-cols}
+data_de <- data_de %>% 
+   mutate(foreigner_n = total_n - germans_n,
+         pop_move_n = pop_move_prop * total_n,
+         unemp_n = unemp_prop * total_n / 100,
+         pop_migr_background_n = pop_migr_background_prop * total_n / 100) %>% 
+  drop_na()
+```
+
+
+
+
+
+## AfD election results
+
+
+
+
+
+```{r}
+elec_results = read.csv2("~/Documents/Github/R-Prediction/kerg.csv", head = TRUE, sep="\t")
+```
+
+
+```{r}
+head(elec_results)
+```
+
+
+Same thing with the election data, here we only need the criterion (AfD success) and the ID variables for merging:
+
+```{r elec-results-new-cols}
+elec_results2 <- elec_results %>%
+  rename(afd_votes = AfD3,
+         area_nr = Nr,
+         area_name = Gebiet,
+         votes_total = Waehler_gueltige_Zweitstimmen_vorlauefig) %>% 
+   mutate(afd_prop = afd_votes/votes_total)    # valid votes only, and of the present Zweitstimme
+```
+
+Note that we are focusing on the Zweitstimme of the present election (hence the `3` in `votes_valid_3` and in `AfD_3`).
+
+
+Note that we are focusing on the Zweitstimme of the present election (hence the `3` in `votes_valid_3` and in `AfD_3`).
+
+# Merge/Join socec data with election data
+
+
+```{r merge}
+data_de %>%
+  left_join(elec_results2, by = "area_name") %>% 
+  left_join(wahlkreise_shp, by = c("area_name" = "WKR_NAME")) -> d_all_with_na
+```
+
+
+
+
+## After-merge preparations
+
+
+
+Add variable for East (1) vs. West (0):
+
+
+```{r east-west-dummy}
+d_all_with_na <- d_all_with_na %>% 
+  mutate(east = case_when(
+    state %in% c("Mecklenburg-Vorpommern", "Brandenburg", "Berlin", "Sachsen-Anhalt", "Sachsen", "Thüringen") ~ "yes",
+    TRUE ~ "no"
+    ) 
+  )
+
+d_all_with_na$east_num <- ifelse(d_all_with_na$east == "yes", 1, 0)
+```
+
+
+
+## Main data frame: d_short 
+
+We will also provide a version without the geo data, and in pure (old school) `data frame` form (ie., not as tibble)_
+
+```{r d-short-with-nas}
+d_all_with_na %>%
+  rename(area_nr = area_nr.x) %>% 
+  select(state,
+         area_nr,
+         area_name,
+         total_n,
+         germans_n,
+         foreigner_n,
+         for_prop,
+         pop_move_n,
+         pop_migr_background_n,
+         income ,
+         unemp_n,
+         unemp_prop,
+         votes_total,
+         afd_votes,
+         afd_prop,
+         state,
+         east,
+         east_num) -> d_short_with_nas
+
+
+```
+
+
+
+
+
+Remove NAs:
+
+```{r nona}
+d_short_with_nas %>% 
+  drop_na() -> d_short_nona
+```
+
+
+Add state id:
+
+```{r staste-id}
+d_short_nona$state_id <- coerce_index(d_short_nona$state)
+
+```
+
+
+Create dictionnary for state id:
+
+```{r state-dict} 
+state_dict <- d_short_nona %>% 
+  distinct(state_id, .keep_all = TRUE) %>% 
+  select(state_id, state)
+```
+
+
+
+Multiply by 1000 to get the real numbers so that a count model gets the "right" data
+
+```{r mult-by-1000}
+d_short_nona %>%
+  mutate_at(vars(total_n, germans_n, foreigner_n, pop_move_n,
+                    pop_migr_background_n, unemp_n), funs(. * 1000)
+  ) -> d_short_nona_1000
+
+if (params$verbose == TRUE) glimpse(d_short_nona_1000)
+
+```
+
+
+```{r}
+View(d_short_nona)
+```
+
